@@ -1,0 +1,11 @@
+[Unit]
+ConditionVirtualization=vmware
+After=open-vm-tools.service
+Before=systemd-networkd.service
+
+[Service]
+ExecStart=/sbin/custom-set-vm-hostname
+Type=oneshot
+
+[Install]
+WantedBy=systemd-networkd.service

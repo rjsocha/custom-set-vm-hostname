@@ -1,0 +1,19 @@
+#!/bin/sh
+if [ -f /var/lib/misc/custom-set-vm-hostname ]
+then
+	echo "Hostname already set - skipping!"
+	exit 0
+fi
+if [ -x /usr/bin/vmtoolsd ]
+then
+	vm_name=$(vmtoolsd --cmd "info-get guestinfo.custom.name" 2>/dev/null)
+	if [ -n "$vm_name" ]
+	then
+		/usr/bin/hostnamectl set-hostname $vm_name
+		echo "$0 hostname auto changed to $vm_name"
+		sed -i -e "s/ubuntu-template/$vm_name/g" /etc/hosts
+		touch /var/lib/misc/custom-set-vm-hostname
+	else
+		echo "$0 hostname not changed - missing guestinfo.custom.name"
+	fi
+fi
