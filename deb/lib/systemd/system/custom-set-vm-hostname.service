@@ -1,6 +1,4 @@
 [Unit]
-ConditionVirtualization=vmware
-After=open-vm-tools.service
 Before=systemd-networkd.service
 
 [Service]

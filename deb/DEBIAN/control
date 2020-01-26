@@ -1,8 +1,8 @@
 Package: custom-set-vm-hostname
-Version: 1.1
+Version: 1.2
 Architecture: all
 Maintainer: Robert Socha <socha@socha.it>
-Depends: open-vm-tools
+Depends: open-vm-tools | virtualbox-guest-utils
 Section: admin
 Priority: optional
 Description: Set hostname based on guestinfo.custom.name provided by open-vm-tools
