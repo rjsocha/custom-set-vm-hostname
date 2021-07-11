@@ -1,0 +1,9 @@
+[Unit]
+Before=systemd-networkd.service
+
+[Service]
+ExecStart=/sbin/kvm-no-cloud-init
+Type=oneshot
+
+[Install]
+WantedBy=systemd-networkd.service

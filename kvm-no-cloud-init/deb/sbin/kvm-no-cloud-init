@@ -1,0 +1,117 @@
+#!/bin/bash
+if [[ -f /var/lib/misc/custom-x-host-ready ]]
+then
+	echo "Host already configured - skipping!"
+	exit 0
+fi
+
+_process_name() {
+	echo "Setting up hostname to: $1"
+	/usr/bin/hostnamectl set-hostname "$1"
+	sed -i -e "s/template/$1/g" /etc/hosts
+	touch /var/lib/misc/custom-x-host-ready
+}
+
+_process_ssh() {
+local _ssh=$1 _user _key _u _home
+	# user@key
+	if [[ ${_ssh} =~ @ ]]
+	then
+		_user=${_ssh%%@*}
+		_key=${_ssh##*@}
+	else
+		_user="root"
+		_key="$_ssh"
+	fi
+	_key=$(echo -n "${_key}" | base64 -d)
+	for _u in ${_user//,/ }
+	do
+		if getent passwd "${_u}" &>/dev/null
+		then
+			echo "Setting up ssh key for ${_u}"
+			_home=$(eval echo ~${_u})
+			if ! [[ -d ${_home}/.ssh ]]
+			then
+				echo "Creating ${_home}/.ssh directory"
+				mkdir -p -m 0700 "${_home}/.ssh"
+				chown "${_u}:${_u}" "${_home}/.ssh"
+			fi
+			echo "${_key}" >"${_home}/.ssh/authorized_keys"
+			chmod 0600 "${_home}/.ssh/authorized_keys"
+			chown "${_u}:${_u}" "${_home}/.ssh/authorized_keys"
+
+		fi
+	done
+
+}
+
+_process_user() {
+local _user=$1 _pass
+	# user[@password]
+	_pass=""
+	if [[ ${_user} =~ @ ]]
+	then
+		_pass=$(echo -n "${_user##*@}" | base64 -d)
+		_user=${_user%%@*}
+	fi
+	if ! getent passwd "${_user}" &>/dev/null
+	then
+		useradd -m -s /bin/bash "${_user}"
+	fi
+	[[ -n ${_pass} ]] && echo -n "${_user}:${_pass}" | chpasswd --encrypted
+}
+
+_process_group() {
+local _entry=$1 _user _group
+	if [[ ${_entry} =~ @ ]]
+	then
+		_user=${_entry%%@*}
+		_group=${_entry##*@}
+		gpasswd -a "${_user}" "${_group}"
+	fi
+}
+
+_process_config() {
+local _in=$1 _data _d _var _v
+	[[ -n ${_in} ]] || return 1
+	IFS='!' read -r -a _data <<< "${_in}"
+	for _d in ${_data[@]}
+	do
+		IFS=":" read -r _var _v <<< "${_d}"
+		case ${_var} in
+			name)
+				_process_name "${_v}"
+				;;
+			ssh)
+				_process_ssh "${_v}"
+				;;
+			user)
+				_process_user "${_v}"
+				;;
+			group)
+				_process_group "${_v}"
+				;;
+		esac
+	done
+}
+
+# Support for kvm/qemu via SMBIOS OEM strings...
+if command -v dmidecode &>/dev/null
+then
+	if dmidecode --oem-string count &>/dev/null
+	then
+		_count=$(dmidecode --oem-string count)
+		if [[ ${_count} =~ ^[0-9]+$ ]]
+		then
+			for _n in $(seq 1 ${_count})
+			do
+				_string=$(dmidecode --oem-string ${_n})
+				if [[ ${_string} =~ ^x-socha! ]]
+				then
+					_process_config "${_string:8}" && break
+				fi
+			done
+		fi
+	fi
+fi
+exit 0
